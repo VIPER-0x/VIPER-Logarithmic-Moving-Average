@@ -1,0 +1,91 @@
+// © I_AM_THE_VIPER
+//@version=6
+indicator('VIPER LOGARITHMIC MOVING AVERAGE', overlay = true)
+HOUR = (hour + 3.5) / 9
+// Length based on the number of bars  
+LENGTH = math.sqrt(open)
+SOURCE = input(close, title = 'Source')
+
+// Function to calculate Logarithmic Moving Average  
+f_Logarithmic_Moving_Average(Source, Length) =>
+    var float SUM = 0.0
+    var float NORM = 0.0
+    for i = 0 to Length - 1 by 1
+        WEIGHT = math.log(Length + 1 - i)
+        NORM := NORM + WEIGHT
+        SUM := SUM + Source[i] * WEIGHT
+        SUM
+    LMA = SUM * math.pow(NORM, -1)
+    MULTIPLIED_LMA = LMA * 100000000000000 / 99999999999999
+    [LMA, MULTIPLIED_LMA]
+
+// Function to determine bias based on close price  
+f_Calculate_Bias(ClosePrice, LMAValue) =>
+    ClosePrice < LMAValue ? 'UP' : 'DOWN'
+
+// Calculate the LMA  
+[LMA, MULTIPLIED_LMA] = f_Logarithmic_Moving_Average(SOURCE, LENGTH)
+
+// Calculate step size using cube root  
+STEP_SIZE = math.pow(open, int(1 / 5)) / 10
+
+// Calculate levels above and below LMA  
+LEVEL_1 = LMA + STEP_SIZE / HOUR
+LEVEL_2 = LEVEL_1 + STEP_SIZE / 4.47
+LEVEL_2 := LEVEL_2 + STEP_SIZE / 5.35
+LEVEL_3 = LEVEL_2 + STEP_SIZE / 8.35
+
+LOWER_LEVEL_1 = LMA - STEP_SIZE / HOUR
+LOWER_LEVEL_2 = LOWER_LEVEL_1 - STEP_SIZE / 4.47
+LOWER_LEVEL_2 := LOWER_LEVEL_2 - STEP_SIZE / 5.35
+LOWER_LEVEL_3 = LOWER_LEVEL_2 - STEP_SIZE / 8.35
+
+// Initialize arrays for lines  
+var array<line> upperLines = array.new_line(0)
+var array<line> lowerLines = array.new_line(0)
+
+// Draw horizontal levels for upper lines if bar is the last  
+if barstate.islast
+    // Clear previous upper lines if any exist  
+    if array.size(upperLines) > 0
+        for j = 0 to array.size(upperLines) - 1 by 1
+            line.delete(array.get(upperLines, j))
+        array.clear(upperLines)
+
+    // Add new upper levels  
+    array.push(upperLines, line.new(bar_index[499], LEVEL_1, bar_index + 100, LEVEL_1, color = color.green, width = 1, extend = extend.none))
+    array.push(upperLines, line.new(bar_index[499], LEVEL_2, bar_index + 100, LEVEL_2, color = color.green, width = 1, extend = extend.none))
+    array.push(upperLines, line.new(bar_index[499], LEVEL_3, bar_index + 100, LEVEL_3, color = color.green, width = 1, extend = extend.none))
+
+    // Clear previous lower lines if any exist  
+    if array.size(lowerLines) > 0
+        for j = 0 to array.size(lowerLines) - 1 by 1
+            line.delete(array.get(lowerLines, j))
+        array.clear(lowerLines)
+
+    // Add new lower levels  
+    array.push(lowerLines, line.new(bar_index[499], LOWER_LEVEL_1, bar_index + 100, LOWER_LEVEL_1, color = color.red, width = 1, extend = extend.none))
+    array.push(lowerLines, line.new(bar_index[499], LOWER_LEVEL_2, bar_index + 100, LOWER_LEVEL_2, color = color.red, width = 1, extend = extend.none))
+    array.push(lowerLines, line.new(bar_index[499], LOWER_LEVEL_3, bar_index + 100, LOWER_LEVEL_3, color = color.red, width = 1, extend = extend.none))
+
+// Calculate and set the bias  
+BIAS = f_Calculate_Bias(close, LMA)
+
+// Draw horizontal line for LMA  
+var line l1 = na
+if barstate.islast
+    line.delete(l1)
+    l1 := line.new(bar_index[499], MULTIPLIED_LMA, bar_index + 100, MULTIPLIED_LMA, color = color.blue, width = 1, extend = extend.none)
+    l1
+
+// Display LMA value and bias in a table  
+var table MY_TABLE = table.new(position.top_right, 11, 11)
+if na(MY_TABLE)
+    table.cell(MY_TABLE, 0, 0, text = 'LMA Value', bgcolor = color.blue, text_color = color.white)
+    table.cell(MY_TABLE, 1, 0, text = 'Bias', bgcolor = color.blue, text_color = color.white)
+
+table.cell(MY_TABLE, 0, 1, str.tostring(LMA), text_color = color.rgb(255, 255, 255))
+
+// Display bias with corresponding background color  
+bgColor = BIAS == 'UP' ? color.green : BIAS == 'DOWN' ? color.red : na
+table.cell(MY_TABLE, 1, 1, BIAS, bgcolor = bgColor, text_color = color.rgb(255, 255, 255))
